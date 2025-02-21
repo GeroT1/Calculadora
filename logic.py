@@ -6,4 +6,4 @@ def Calculate(expression):
         result = eval(expression, {"__builtins__": None}, {"math": math})
         return result
     except Exception:
-        return "Error"
+        return "Syntax error"

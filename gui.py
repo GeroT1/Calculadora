@@ -1,6 +1,7 @@
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QGridLayout, QPushButton, QLineEdit
 from PyQt6.QtGui import QIcon
 from logic import Calculate
+import re
 
 class CalculatorGUI(QWidget):
     def __init__(self):
@@ -10,8 +11,10 @@ class CalculatorGUI(QWidget):
 
     def InitializeGUI(self):
         self.setWindowTitle("Calculator")
-        self.setGeometry(100, 100, 10, 500)
+        self.setFixedSize(320,500)
         self.setWindowIcon(QIcon("resources\\icon.png"))
+        with open("styles.css", "r") as f:
+            self.setStyleSheet(f.read())
         
     def CreateInteraction(self):
         layout = QVBoxLayout()
@@ -21,7 +24,7 @@ class CalculatorGUI(QWidget):
         layout.addWidget(self.display)
 
         buttons = [
-            "(", ")","C", "/",
+            "CE", "C","<-", "/",
             "7", "8", "9", "*",
             "4", "5", "6", "-",
             "1", "2", "3", "+",
@@ -42,6 +45,8 @@ class CalculatorGUI(QWidget):
                 row += 1
         
         layout.addLayout(grid_layout)
+        layout.setContentsMargins(5, 0, 5, 0)
+        layout.setSpacing(3)
         self.setLayout(layout)
 
     def pressed_button(self, text):
@@ -50,11 +55,14 @@ class CalculatorGUI(QWidget):
             result = Calculate(expression)
             self.display.setText(str(result))
         elif text == "<-":
-            print("Borrar el ultimo caracter")
+            self.display.setText(self.display.text()[:-1])
         elif text == "C":
             self.display.clear()
         elif text == "CE":
-            print("Borrar ultimos numeros despues de una operacion por ejemplo en 4 x 9 se borraria el",
-                   "9 no el 4 ni la x")
+            expression = self.display.text()
+            match = re.search(r"[+\*-/](?!.*[+\*-/])", expression)
+            if match:
+                pos = match.start() + 1
+                self.display.setText(expression[:pos])
         else:
             self.display.setText(self.display.text() + text)

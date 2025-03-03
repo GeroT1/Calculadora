@@ -23,6 +23,10 @@ class CalculatorGUI(QWidget):
             self.setStyleSheet(f.read())
 
     def CreateInteraction(self):
+        self.last_button_equals = False
+        self.operators = ["+", "-", "/", "*", "%"]
+        self.history_operations = []
+        self.history_results = []
         self.history = []
         self.history_visible = False
         layout = QVBoxLayout()
@@ -31,6 +35,15 @@ class CalculatorGUI(QWidget):
         top_layout = QHBoxLayout()
         self.button_history = QPushButton()
         self.button_history.setIcon(QIcon("resources\\history.png"))
+        self.button_history.setStyleSheet("""
+            QPushButton {
+                background-color: transparent;
+                border: none;
+                padding: 0px;
+                min-width: 24px;
+                min-height: 24px;
+            }
+        """)
         self.button_history.clicked.connect(self.toogle_history)
         top_layout.addStretch()
         top_layout.addWidget(self.button_history)
@@ -39,25 +52,34 @@ class CalculatorGUI(QWidget):
         self.top_widget.setLayout(top_layout)
         self.top_widget.setMinimumHeight(100)
         layout.addWidget(self.top_widget)
+
         self.opacity_effect = QGraphicsOpacityEffect(self.top_widget)
+        self.opacity_effect.setOpacity(1.0)
         self.top_widget.setGraphicsEffect(self.opacity_effect)
 
         # **Mid Layout: Display de la calculadora**
         self.mid_layout = QVBoxLayout()
         self.display = QLineEdit()
-        self.displayResult = QLineEdit()
+        self.displayResult = QLineEdit()    
         
         self.display.setAlignment(Qt.AlignmentFlag.AlignRight)
         self.displayResult.setAlignment(Qt.AlignmentFlag.AlignRight)
         self.display.setReadOnly(True)
         self.displayResult.setReadOnly(True)
         self.display.setFixedHeight(60)
+        self.display.setStyleSheet("font-size: 50px")
         self.displayResult.setFixedHeight(35)
-        self.mid_layout.addWidget(self.display)
+        self.displayResult.setStyleSheet("border: None; color: gray; font-size: 15px")
         self.mid_layout.addWidget(self.displayResult)
+        self.mid_layout.addWidget(self.display)
         layout.addLayout(self.mid_layout)
+
         self.opacity_effectQLine = QGraphicsOpacityEffect(self.display)
+        self.opacity_effectQLine.setOpacity(1.0)
         self.display.setGraphicsEffect(self.opacity_effectQLine)
+        self.opacity_effectQLineResult = QGraphicsOpacityEffect(self.displayResult)
+        self.opacity_effectQLineResult.setOpacity(1.0)
+        self.displayResult.setGraphicsEffect(self.opacity_effectQLineResult)
 
         layout.addStretch()
         self.stack = QStackedWidget()
@@ -146,6 +168,7 @@ class CalculatorGUI(QWidget):
 
         if text == "<-" or text == "":
             self.display.setText(self.display.text()[:-1])
+            self.displayResult.clear()
             return
         elif text == "C":
             self.display.clear()
@@ -156,31 +179,38 @@ class CalculatorGUI(QWidget):
         if text == "=":
             if not expression:
                 return
-            self.displayResult.clear()
-            self.reset_display = True
+            self.displayResult.setText(expression)
             result = calculate(expression)
             self.display.setText(str(result))
+
+            self.history_operations.append(expression)
+            self.history_results.append(str(result))
+            
             formatted_text = (
                 f"<div>"
                 f"<span style='color:gray; font-;font-size:12pt;'>{expression} = </span><br>"
                 f"<span style='color:white; font-size:16pt;'>{result}</span>"
                 f"</div>"
             )
+            self.last_button_equals = True
             self.history.append(formatted_text)
-            self.reset_display = True
-        elif self.reset_display:
-            self.display.clear()
-            self.reset_display = False
-            self.display.setText(text)
-            self.update_result()
+            return
+        if self.last_button_equals:
+            if text in self.operators:
+                self.displayResult.clear()
+                self.display.setText(self.display.text() + text)
+            else:
+                self.display.clear()
+                self.displayResult.clear()
+                self.display.setText(text)
+
+            self.last_button_equals = False
         else:
+            self.displayResult.clear()
             self.display.setText(self.display.text() + text)
-            self.update_result()
 
     def toogle_history(self):
         if not self.history_visible:
-            self.saved_expression = self.display.text()
-
             self.update_history()
             self.animation = QPropertyAnimation(self.history_widget, b"geometry")
             self.animation.setStartValue(QRect(0, self.height(), self.width(), 300))
@@ -198,13 +228,18 @@ class CalculatorGUI(QWidget):
             self.opacity_animationQLine.setEndValue(0.5)
             self.opacity_animationQLine.setEasingCurve(QEasingCurve.Type.InOutQuad)
 
+            self.opacity_animationQLineResult = QPropertyAnimation(self.opacity_effectQLineResult, b"opacity")
+            self.opacity_animationQLineResult.setStartValue(1.0)
+            self.opacity_animationQLineResult.setEndValue(0.5)
+            self.opacity_animationQLineResult.setEasingCurve(QEasingCurve.Type.InOutQuad)
+
             self.stack.setCurrentWidget(self.scroll_area)
             self.animation.start()
             self.opacity_animation.start()
             self.opacity_animationQLine.start()
+            self.opacity_animationQLineResult.start()
              
         else:
-            self.display.setText(self.saved_expression)
             self.animation.stop()
             self.opacity_animation = QPropertyAnimation(self.opacity_effect, b"opacity")
             self.opacity_animation.setStartValue(0.5)
@@ -216,8 +251,14 @@ class CalculatorGUI(QWidget):
             self.opacity_animationQLine.setEndValue(1.0)
             self.opacity_animationQLine.setEasingCurve(QEasingCurve.Type.InOutSine)
 
+            self.opacity_animationQLineResult = QPropertyAnimation(self.opacity_effectQLineResult, b"opacity")
+            self.opacity_animationQLineResult.setStartValue(0.5)
+            self.opacity_animationQLineResult.setEndValue(1.0)
+            self.opacity_animationQLineResult.setEasingCurve(QEasingCurve.Type.InOutSine)
+
             self.opacity_animation.start()
             self.opacity_animationQLine.start()
+            self.opacity_animationQLineResult.start()
 
             self.stack.setCurrentWidget(self.buttons_widget)
 
@@ -232,14 +273,31 @@ class CalculatorGUI(QWidget):
 
         if self.history:
             self.delete_history.show()
-            for operation in self.history:
+            for i, operation in enumerate(self.history):
+                container = QWidget()
+                container_layout = QVBoxLayout(container)
+                container_layout.setContentsMargins(5, 5, 5, 5)
+
                 label = QLabel(operation)
                 label.setAlignment(Qt.AlignmentFlag.AlignRight)
-                self.history_entries_layout.addWidget(label)
+                label.setCursor(Qt.CursorShape.PointingHandCursor)
+
+                label.mousePressEvent = lambda event, index=i: self.copy_operation(index)
+
+                container_layout.addWidget(label)
+                self.history_entries_layout.addWidget(container)
         else:
             label = QLabel("No hay historial aún")
             label.setAlignment(Qt.AlignmentFlag.AlignCenter)
             self.history_entries_layout.addWidget(label)
+
+    def copy_operation(self, index):
+        if 0 <= index < len(self.history_operations):
+            operation = self.history_operations[index]
+            self.display.setText(operation)
+            self.displayResult.clear()
+            self.toogle_history()
+            self.last_button_equals = False
 
     def mouse_pressed(self, event):
         if self.history_visible:
@@ -273,27 +331,3 @@ class CalculatorGUI(QWidget):
             self.pressed_button("%")
         elif key == Qt.Key.Key_H:
             self.toogle_history()
-        
-    def update_result(self):
-        expression = self.display.text()
-
-        if not expression or expression == "<-":
-            self.displayResult.clear()
-            return
-        
-        if expression[-1] in "+-/*%":
-            try:
-                base_expression = expression[:-1]
-                if base_expression:
-                    result = calculate(base_expression)
-                    self.displayResult.setText(str(result))
-                else:
-                    self.displayResult.clear()
-            except:
-                self.displayResult.clear()
-        else:
-            try:
-                result = calculate(expression)
-                self.displayResult.setText(str(result))
-            except:
-                pass

@@ -5,7 +5,16 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt, QPropertyAnimation, QRect, QEasingCurve
 from PyQt6.QtGui import QIcon
 from logic import calculate
-import re
+import os
+import sys
+
+def resource_path(relative_path):
+    try:
+        base_path = sys._MEIPASS
+    except Exception:
+        base_path = os.path.abspath(".")
+
+    return os.path.join(base_path, relative_path)
 
 class CalculatorGUI(QWidget):
     def __init__(self):
@@ -18,9 +27,19 @@ class CalculatorGUI(QWidget):
     def InitializeGUI(self):
         self.setWindowTitle("Calculator")
         self.setFixedSize(320, 500)
-        self.setWindowIcon(QIcon("resources\\icon.png"))
-        with open("styles.css", "r") as f:
-            self.setStyleSheet(f.read())
+        icon_path = resource_path("resources\\icon.png")
+        self.setWindowIcon(QIcon(icon_path))
+        
+        css_path = resource_path("styles.css")
+    
+        try:
+            with open(css_path, "r", encoding='utf-8') as f:
+                stylesheet = f.read()
+                self.setStyleSheet(stylesheet)
+        except FileNotFoundError:
+            print(f"Error: No se encontró el archivo de estilos en {css_path}")
+        except Exception as e:
+            print(f"Error al cargar estilos: {e}")
 
     def CreateInteraction(self):
         self.last_button_equals = False
@@ -34,7 +53,9 @@ class CalculatorGUI(QWidget):
 
         top_layout = QHBoxLayout()
         self.button_history = QPushButton()
-        self.button_history.setIcon(QIcon("resources\\history.png"))
+        
+        history_icon_path = resource_path("resources\\history.png")
+        self.button_history.setIcon(QIcon(history_icon_path))
         self.button_history.setStyleSheet("""
             QPushButton {
                 background-color: transparent;
@@ -113,7 +134,8 @@ class CalculatorGUI(QWidget):
         history_footer_layout.setContentsMargins(0, 0, 0, 0)
 
         self.delete_history = QPushButton()
-        self.delete_history.setIcon(QIcon("resources\\delete_icon.png"))
+        delete_icon_path = resource_path("resources\\delete_icon.png")
+        self.delete_history.setIcon(QIcon(delete_icon_path))
         self.delete_history.clicked.connect(self.clear_history)
         self.delete_history.hide()
 
@@ -145,7 +167,8 @@ class CalculatorGUI(QWidget):
             button = QPushButton(text_button)        
             if text_button == "<-":
                 button.setText("")
-                button.setIcon(QIcon("resources\\backspace.png"))
+                backspace_icon_path = resource_path("resources\\backspace.png")
+                button.setIcon(QIcon(backspace_icon_path))
 
             button.clicked.connect(lambda checked, text=text_button: self.pressed_button(text))
             self.buttons_layout.addWidget(button, row, col)

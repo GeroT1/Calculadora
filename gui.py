@@ -2,7 +2,7 @@ from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QGridLayout, QPushButton, QLineEdit, QLabel,
     QStackedWidget, QLayout, QScrollArea, QGraphicsOpacityEffect
 )
-from PyQt6.QtCore import Qt, QPropertyAnimation, QRect, QEasingCurve
+from PyQt6.QtCore import Qt, QPropertyAnimation, QRect, QEasingCurve, QTimer
 from PyQt6.QtGui import QIcon
 from logic import calculate
 import os
@@ -169,6 +169,21 @@ class CalculatorGUI(QWidget):
                 button.setText("")
                 backspace_icon_path = resource_path("resources\\backspace.png")
                 button.setIcon(QIcon(backspace_icon_path))
+            
+            if text_button == "=":
+                button.setStyleSheet("""
+                    QPushButton {
+                        background-color: #dcbca6; 
+                        color: black;
+                    }
+                    QPushButton:hover {
+                        background-color: #c5a58e; /* Un tono más oscuro */
+                    }
+                    QPushButton:pressed {
+                        background-color: #b48f76; /* Aún más oscuro */
+                    }
+                """)
+                
 
             button.clicked.connect(lambda checked, text=text_button: self.pressed_button(text))
             self.buttons_layout.addWidget(button, row, col)
@@ -182,6 +197,13 @@ class CalculatorGUI(QWidget):
             return
         
         expression = self.display.text().strip()
+
+
+        if text in self.operators:
+            if expression and expression[-1] in self.operators:
+                self.display.setText(expression[:-1] + text)
+                return
+
         if text == "+/-":
             if expression and not expression.startswith("-"):
                 self.display.setText("-" + expression)
@@ -344,13 +366,29 @@ class CalculatorGUI(QWidget):
         text = event.text()
 
         if text and text in "0123456789.+-*/":
-            self.pressed_button(text)
+            for button in self.findChildren(QPushButton):
+                if button.text() == text:
+                    button.setDown(True)
+                    QTimer.singleShot(100, lambda b=button: b.setDown(False))
+                    self.pressed_button(text)
         
         elif key == Qt.Key.Key_Enter or key == Qt.Key.Key_Equal or key == Qt.Key.Key_Return:
-            self.pressed_button("=")
+            for button in self.findChildren(QPushButton):
+                if button.text() == "=":
+                    button.setDown(True)
+                    QTimer.singleShot(100, lambda b=button: b.setDown(False))
+                    self.pressed_button("=")
         elif key == Qt.Key.Key_Backspace:
-            self.pressed_button("<-")
+            for button in self.findChildren(QPushButton):
+                if button.text() == "<-" or button.text() == "":
+                    button.setDown(True)
+                    QTimer.singleShot(100, lambda b=button: b.setDown(False))
+                    self.pressed_button("<-")
         elif key == Qt.Key.Key_Percent:
-            self.pressed_button("%")
+            for button in self.findChildren(QPushButton):
+                if button.text() == "%":
+                    button.setDown(True)
+                    QTimer.singleShot(100, lambda b=button: b.setDown(False))
+                    self.pressed_button("%")
         elif key == Qt.Key.Key_H:
             self.toogle_history()

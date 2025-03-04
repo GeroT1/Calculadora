@@ -16,6 +16,10 @@ QPushButton:hover {
     background-color: #323232;
 }
 
+QPushButton:pressed {
+    background-color: #282828;
+}
+
 QLineEdit {
     height: 180px;
     padding: 0;

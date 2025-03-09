@@ -21,9 +21,6 @@ QPushButton:pressed {
 }
 
 QLineEdit {
-    height: 180px;
     padding: 0;
-    font-size: 30px;
-    /*border: none; */
     color: aliceblue;
 }

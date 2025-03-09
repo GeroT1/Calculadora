@@ -21,7 +21,6 @@ class CalculatorGUI(QWidget):
         super().__init__()
         self.InitializeGUI()
         self.CreateInteraction()
-        self.reset_display = False
         self.mousePressEvent = self.mouse_pressed
 
     def InitializeGUI(self):
@@ -43,6 +42,7 @@ class CalculatorGUI(QWidget):
 
     def CreateInteraction(self):
         self.last_button_equals = False
+        self.pressedEqualHistoryOperation = False
         self.operators = ["+", "-", "/", "*", "%"]
         self.history_operations = []
         self.history_results = []
@@ -87,10 +87,10 @@ class CalculatorGUI(QWidget):
         self.displayResult.setAlignment(Qt.AlignmentFlag.AlignRight)
         self.display.setReadOnly(True)
         self.displayResult.setReadOnly(True)
-        self.display.setFixedHeight(60)
-        self.display.setStyleSheet("font-size: 50px")
+        self.display.setFixedHeight(65)
+        self.display.setStyleSheet("font-size: 58px")
         self.displayResult.setFixedHeight(35)
-        self.displayResult.setStyleSheet("border: None; color: gray; font-size: 15px")
+        self.displayResult.setStyleSheet("border: None; color: gray; font-size: 16px")
         self.mid_layout.addWidget(self.displayResult)
         self.mid_layout.addWidget(self.display)
         layout.addLayout(self.mid_layout)
@@ -155,7 +155,7 @@ class CalculatorGUI(QWidget):
 
     def create_buttons(self):
         buttons = [
-            "%", "C", "<-", "/",
+            "%", "C", "backspace", "/",
             "7", "8", "9", "*",
             "4", "5", "6", "-",
             "1", "2", "3", "+",
@@ -165,11 +165,15 @@ class CalculatorGUI(QWidget):
         row, col = 0, 0
         for text_button in buttons:
             button = QPushButton(text_button)        
-            if text_button == "<-":
+            if text_button == "backspace":
                 button.setText("")
+                button.setProperty("action", "backspace")
                 backspace_icon_path = resource_path("resources\\backspace.png")
                 button.setIcon(QIcon(backspace_icon_path))
-            
+                button.clicked.connect(self.handle_backspace)
+            else:
+                button.clicked.connect(lambda checked, text=text_button: self.pressed_button(text))
+
             if text_button == "=":
                 button.setStyleSheet("""
                     QPushButton {
@@ -185,7 +189,7 @@ class CalculatorGUI(QWidget):
                 """)
                 
 
-            button.clicked.connect(lambda checked, text=text_button: self.pressed_button(text))
+            
             self.buttons_layout.addWidget(button, row, col)
             col += 1
             if col > 3:
@@ -193,66 +197,134 @@ class CalculatorGUI(QWidget):
                 row += 1
 
     def pressed_button(self, text):
-        if self.history_visible:
+        if len(self.display.text()) >= 16 and text not in ["+/-", "C", "="] and text not in self.operators and not self.last_button_equals:
             return
-        
+
         expression = self.display.text().strip()
 
+        if expression and expression[0] == "0":
+            self.display.setText(expression[:-1])
 
-        if text in self.operators:
-            if expression and expression[-1] in self.operators:
-                self.display.setText(expression[:-1] + text)
-                return
+        expressionResult= self.displayResult.text().strip()
 
         if text == "+/-":
-            if expression and not expression.startswith("-"):
+            if not expression or not expression.startswith("-"):
                 self.display.setText("-" + expression)
             elif expression.startswith("-"):
                 self.display.setText(expression[1:])
             return
 
-        if text == "<-" or text == "":
-            self.display.setText(self.display.text()[:-1])
-            self.displayResult.clear()
-            return
-        elif text == "C":
+        if text == "C":
             self.display.clear()
             self.displayResult.clear()
-            self.reset_display = False
+            self.last_button_equals = False
+            self.adjust_font_size()
             return
-
         if text == "=":
-            if not expression:
+            if not expression or expression == "0":
                 return
-            self.displayResult.setText(expression)
-            result = calculate(expression)
-            self.display.setText(str(result))
-
-            self.history_operations.append(expression)
-            self.history_results.append(str(result))
             
-            formatted_text = (
-                f"<div>"
-                f"<span style='color:gray; font-;font-size:12pt;'>{expression} = </span><br>"
-                f"<span style='color:white; font-size:16pt;'>{result}</span>"
-                f"</div>"
-            )
-            self.last_button_equals = True
-            self.history.append(formatted_text)
-            return
-        if self.last_button_equals:
-            if text in self.operators:
-                self.displayResult.clear()
-                self.display.setText(self.display.text() + text)
-            else:
+            if expression == "Syntax error":
                 self.display.clear()
                 self.displayResult.clear()
-                self.display.setText(text)
+                return
 
+            if self.history_results and expression == self.history_results[-1] or self.pressedEqualHistoryOperation:
+                
+                if len(self.history_operations) >= 1:
+                    if self.pressedEqualHistoryOperation:
+                        last_operation = self.copiedOperation
+                    else:
+                        last_operation = self.history_operations[-1]
+                    
+                    operator = None
+                    second_operand = None
+                    found = False
+                    i = 0
+                    while i < len(self.operators) and not found:
+                        op = self.operators[i]
+                        
+                        if op in last_operation:
+                            last_op_index = last_operation.rfind(op)
+                            operator = op
+                            second_operand = last_operation[last_op_index+1:]
+                            found = True
+                        i += 1
+                    
+                    if operator and second_operand:
+                        self.displayResult.clear()
+                        expressionResult = expression + operator
+                        expression = second_operand
+                    else:
+                        return
+
+                    self.pressedEqualHistoryOperation = False
+                        
+                          
+            self.displayResult.setText(expressionResult + expression)
+            result = calculate(expressionResult + expression)
+            
+            result_str = str(result)
+            if len(result_str) > 16:
+                result_str = f"{float(result):.10e}"
+
+            self.display.setText(result_str)
+
+            self.adjust_font_size()
+            if not result == "Syntax error":
+                self.history_operations.append(expressionResult + expression)
+                self.history_results.append(result_str)
+                
+                formatted_text = (
+                    f"<div>"
+                    f"<span style='color:gray; font-;font-size:12pt;'>{expressionResult + expression} = </span><br>"
+                    f"<span style='color:white; font-size:16pt;'>{result_str}</span>"
+                    f"</div>"
+                )
+                self.history.append(formatted_text)
+            self.last_button_equals = True
+            return
+        
+        if text in self.operators:
+            
+            if expression:
+                if expression[-1] in self.operators:
+                    self.display.setText(expression[:-1] + text)
+                    self.adjust_font_size()
+                    return
+            else:
+                return
+            
+            if self.last_button_equals:
+                if text in self.operators:
+                    self.displayResult.setText(self.display.text() + text)
+                    self.display.clear()
+
+                self.last_button_equals = False
+                return
+            
+            else:
+                self.displayResult.setText(expression + text)
+                self.display.clear()
+                return
+            
+        if self.last_button_equals:
+            self.display.clear()
+            self.displayResult.clear()
+            self.display.setText(text)
             self.last_button_equals = False
         else:
-            self.displayResult.clear()
             self.display.setText(self.display.text() + text)
+            self.adjust_font_size()
+
+    def handle_backspace(self):
+        if not self.history_visible and not self.display.text() == "":
+            if self.display.text() == "Syntax error":
+                self.display.clear()    
+            else:
+                self.display.setText(self.display.text()[:-1])
+                self.displayResult.clear()
+            self.adjust_font_size()
 
     def toogle_history(self):
         if not self.history_visible:
@@ -339,9 +411,12 @@ class CalculatorGUI(QWidget):
     def copy_operation(self, index):
         if 0 <= index < len(self.history_operations):
             operation = self.history_operations[index]
-            self.display.setText(operation)
-            self.displayResult.clear()
+            result = self.history_results[index]
+            self.displayResult.setText(operation)
+            self.display.setText(result)
             self.toogle_history()
+            self.pressedEqualHistoryOperation = True
+            self.copiedOperation = operation
             self.last_button_equals = False
 
     def mouse_pressed(self, event):
@@ -355,6 +430,18 @@ class CalculatorGUI(QWidget):
         self.delete_history.hide()
         self.history=[]
         self.update_history()
+
+    def adjust_font_size(self):
+        text_length = len(self.display.text())
+        
+        if text_length <= 10:
+            font_size = 58
+        else:
+            reduction_per_char = 5
+            font_size = 58 - (text_length - 10) * reduction_per_char
+            font_size = max(font_size, 28)
+        
+        self.display.setStyleSheet(f"font-size: {font_size}px")
 
     def keyPressEvent(self, event):
         if self.history_visible:
@@ -379,11 +466,21 @@ class CalculatorGUI(QWidget):
                     QTimer.singleShot(100, lambda b=button: b.setDown(False))
                     self.pressed_button("=")
         elif key == Qt.Key.Key_Backspace:
-            for button in self.findChildren(QPushButton):
-                if button.text() == "<-" or button.text() == "":
-                    button.setDown(True)
-                    QTimer.singleShot(100, lambda b=button: b.setDown(False))
-                    self.pressed_button("<-")
+            backspace_button = None
+            buttons = self.findChildren(QPushButton)
+            i = 0
+            found = False
+            
+            while i < len(buttons) and not found:
+                if buttons[i].property("action") == "backspace":
+                    backspace_button = buttons[i]
+                    found = True
+                i += 1
+                    
+            if backspace_button:
+                backspace_button.setDown(True)
+                QTimer.singleShot(100, lambda b=backspace_button: b.setDown(False))
+                self.handle_backspace()
         elif key == Qt.Key.Key_Percent:
             for button in self.findChildren(QPushButton):
                 if button.text() == "%":

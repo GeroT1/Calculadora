@@ -41,6 +41,7 @@ class CalculatorGUI(QWidget):
             print(f"Error al cargar estilos: {e}")
 
     def CreateInteraction(self):
+        self.last_button_operator = False
         self.last_button_equals = False
         self.pressedEqualHistoryOperation = False
         self.operators = ["+", "-", "/", "*", "%"]
@@ -154,6 +155,8 @@ class CalculatorGUI(QWidget):
         self.setLayout(layout)
 
     def create_buttons(self):
+        self.changed_negative = False
+        self.changed_positive = False
         buttons = [
             "%", "C", "backspace", "/",
             "7", "8", "9", "*",
@@ -197,116 +200,31 @@ class CalculatorGUI(QWidget):
                 row += 1
 
     def pressed_button(self, text):
-        if len(self.display.text()) >= 16 and text not in ["+/-", "C", "="] and text not in self.operators and not self.last_button_equals:
+        
+        if (len(self.display.text()) >= 16 and text not in ["+/-", "C", "="] and 
+            text not in self.operators and not self.last_button_equals):
             return
 
         expression = self.display.text().strip()
 
-        if expression and expression[0] == "0":
+        if expression and expression[0] == "0" and not expression == self.history_results[-1] and not self.pressedEqualHistoryOperation:
             self.display.setText(expression[:-1])
 
-        expressionResult= self.displayResult.text().strip()
-
         if text == "+/-":
-            if not expression or not expression.startswith("-"):
-                self.display.setText("-" + expression)
-            elif expression.startswith("-"):
-                self.display.setText(expression[1:])
+            self.handle_change_sing()
             return
 
         if text == "C":
-            self.display.clear()
-            self.displayResult.clear()
-            self.last_button_equals = False
-            self.adjust_font_size()
+            self.handle_deleteAll()
             return
+
         if text == "=":
-            if not expression or expression == "0":
-                return
-            
-            if expression == "Syntax error":
-                self.display.clear()
-                self.displayResult.clear()
-                return
-
-            if self.history_results and expression == self.history_results[-1] or self.pressedEqualHistoryOperation:
-                
-                if len(self.history_operations) >= 1:
-                    if self.pressedEqualHistoryOperation:
-                        last_operation = self.copiedOperation
-                    else:
-                        last_operation = self.history_operations[-1]
-                    
-                    operator = None
-                    second_operand = None
-                    found = False
-                    i = 0
-                    while i < len(self.operators) and not found:
-                        op = self.operators[i]
-                        
-                        if op in last_operation:
-                            last_op_index = last_operation.rfind(op)
-                            operator = op
-                            second_operand = last_operation[last_op_index+1:]
-                            found = True
-                        i += 1
-                    
-                    if operator and second_operand:
-                        self.displayResult.clear()
-                        expressionResult = expression + operator
-                        expression = second_operand
-                    else:
-                        return
-
-                    self.pressedEqualHistoryOperation = False
-                        
-                          
-            self.displayResult.setText(expressionResult + expression)
-            result = calculate(expressionResult + expression)
-            
-            result_str = str(result)
-            if len(result_str) > 16:
-                result_str = f"{float(result):.10e}"
-
-            self.display.setText(result_str)
-
-            self.adjust_font_size()
-            if not result == "Syntax error":
-                self.history_operations.append(expressionResult + expression)
-                self.history_results.append(result_str)
-                
-                formatted_text = (
-                    f"<div>"
-                    f"<span style='color:gray; font-;font-size:12pt;'>{expressionResult + expression} = </span><br>"
-                    f"<span style='color:white; font-size:16pt;'>{result_str}</span>"
-                    f"</div>"
-                )
-                self.history.append(formatted_text)
-            self.last_button_equals = True
+            self.handle_equals()
             return
         
         if text in self.operators:
-            
-            if expression:
-                if expression[-1] in self.operators:
-                    self.display.setText(expression[:-1] + text)
-                    self.adjust_font_size()
-                    return
-            else:
-                return
-            
-            if self.last_button_equals:
-                if text in self.operators:
-                    self.displayResult.setText(self.display.text() + text)
-                    self.display.clear()
-
-                self.last_button_equals = False
-                return
-            
-            else:
-                self.displayResult.setText(expression + text)
-                self.display.clear()
-                return
+            self.handle_operators(text)
+            return
             
         if self.last_button_equals:
             self.display.clear()
@@ -317,13 +235,142 @@ class CalculatorGUI(QWidget):
             self.display.setText(self.display.text() + text)
             self.adjust_font_size()
 
+    def handle_change_sing(self):
+        expression = self.display.text().strip()
+
+        if not expression or not expression.startswith("-"):
+            self.display.setText("-" + expression)
+            self.changed_negative = True
+            self.changed_positive = False
+        elif expression.startswith("-"):
+            self.display.setText(expression[1:])
+            self.changed_negative = False
+            self.changed_positive = True
+        self.last_button_operator = False
+        return
+    
+    def handle_deleteAll(self):
+        self.display.clear()
+        self.displayResult.clear()
+        self.last_button_equals = False
+        self.last_button_operator = False
+        self.adjust_font_size()
+        return
+    
+    def handle_equals(self):
+        expression = self.display.text().strip()
+        expressionResult= self.displayResult.text().strip()
+        
+        if not expression or (expression == "0" and not expressionResult):
+            return
+            
+        if not expressionResult and not self.pressedEqualHistoryOperation:
+            return
+
+        if expression == "Syntax error":
+            self.display.clear()
+            self.displayResult.clear()
+            return
+            
+        if (self.history_results and not self.last_button_operator and
+            (expression == self.history_results[-1] or expression == "-" + self.history_results[-1] or expression == self.history_results[-1][1:]) or 
+            self.pressedEqualHistoryOperation ):
+
+            if len(self.history_operations) >= 1:
+                if self.pressedEqualHistoryOperation:
+                    last_operation = self.copiedOperation
+                else:
+                    last_operation = self.history_operations[-1]
+
+            last_op_index = False
+
+            operator = None
+            second_operand = None
+            found = False
+            i = 0
+            if (self.changed_negative or self.changed_positive) and last_operation[0] == "-":
+                last_operation = last_operation[1:]
+
+            while i < len(self.operators) and not found:
+                op = self.operators[i]
+                    
+                if op in last_operation:
+                    last_op_index = last_operation.rfind(op)
+                    operator = op
+                    second_operand = last_operation[last_op_index+1:]
+                    found = True
+                i += 1
+
+            if operator and second_operand:
+                self.displayResult.clear()
+                expressionResult = expression + operator
+                expression = second_operand
+                      
+        self.displayResult.setText(expressionResult + expression)
+        result = calculate(expressionResult + expression)
+            
+        result_str = str(result)
+        if len(result_str) > 16:
+            result_str = f"{float(result):.10e}"
+        self.display.setText(result_str)
+
+        self.adjust_font_size()
+        if not result == "Syntax error":
+            self.history_operations.append(expressionResult + expression)
+            self.history_results.append(result_str)
+                
+            formatted_text = (
+                f"<div>"
+                f"<span style='color:gray; font-;font-size:12pt;'>{expressionResult + expression} = </span><br>"
+                f"<span style='color:white; font-size:16pt;'>{result_str}</span>"
+                f"</div>"
+            )
+            self.history.append(formatted_text)
+
+        self.last_button_equals = True
+        self.last_button_operator = False
+        self.pressedEqualHistoryOperation = False
+        return
+
+    def handle_operators(self, text):
+        expression = self.display.text().strip()
+        expressionResult= self.displayResult.text().strip()
+
+        if (not expression and not expressionResult) or expression == "0" or expressionResult.endswith("0"):
+            self.displayResult.clear()
+            return
+ 
+        if self.last_button_equals:
+            self.displayResult.setText(self.display.text() + text)
+            self.display.clear()
+            self.last_button_operator = True
+            self.last_button_equals = False
+            return
+            
+        else:
+            if self.displayResult.text() and self.displayResult.text()[-1] in self.operators:
+                if self.display.text():
+                    self.pressed_button("=")
+                    self.displayResult.setText(self.display.text() + text)
+                    self.last_button_equals = False
+                    self.display.clear()
+                else:
+                    self.displayResult.setText(self.displayResult.text()[:-1] + text)
+                    self.display.clear()
+            else:
+                self.displayResult.setText(expression + text)
+                self.display.clear()
+
+            self.last_button_operator = True
+            return
+
     def handle_backspace(self):
         if not self.history_visible and not self.display.text() == "":
             if self.display.text() == "Syntax error":
                 self.display.clear()    
             else:
                 self.display.setText(self.display.text()[:-1])
-                self.displayResult.clear()
+                
             self.adjust_font_size()
 
     def toogle_history(self):

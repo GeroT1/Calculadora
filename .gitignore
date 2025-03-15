@@ -1,0 +1,4 @@
+*.toc
+*.spec
+build/
+dist/

@@ -1,1 +1,0 @@
-pyinstaller --onefile --windowed --add-data "resources;resources" --add-data "styles.css;." --hidden-import PyQt6.QtWidgets --hidden-import PyQt6.QtCore --hidden-import PyQt6.QtGui main.py

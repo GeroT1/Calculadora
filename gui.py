@@ -451,7 +451,7 @@ class CalculatorGUI(QWidget):
                 container_layout.addWidget(label)
                 self.history_entries_layout.addWidget(container)
         else:
-            label = QLabel("No hay historial aún")
+            label = QLabel("There is no history yet.")
             label.setAlignment(Qt.AlignmentFlag.AlignCenter)
             self.history_entries_layout.addWidget(label)
 
